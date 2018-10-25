@@ -46,6 +46,9 @@ function pixelmatch(img1, img2, output, width, height, options) {
         }
     }
 
+    // add method for converting array of points to array of boundingRects
+    diffs.toBoundingRects = toBoundingRects;
+
     // return different points or count of it
     return options.returnPositions ? diffs : diffs.length;
 }
@@ -157,4 +160,47 @@ function grayPixel(img, i) {
         g = blend(img[i + 1], a),
         b = blend(img[i + 2], a);
     return rgb2y(r, g, b);
+}
+
+function toBoundingRects(ksize) {
+    ksize = ksize || 10;
+
+    var rects = [];
+    posLoop: for (var i = 0; i < this.length; i++) {
+        for (var j = 0, pos = this[i]; j < rects.length; j++) {
+            for (var k = 0, posArrayInRect = rects[j]; k < posArrayInRect.length; k++) {
+
+                var posInRect = posArrayInRect[k];
+                var diffs = { width: Math.abs(pos.x - posInRect.x), height: Math.abs(pos.y - posInRect.y) }
+
+                if (diffs.width <= ksize && diffs.height <= ksize) {
+                    rects[j].push(pos);
+                    continue posLoop;
+                }
+            }
+        }
+        // if pos is not near to rects, add to rects.
+        rects.push([ pos ])
+    }
+
+    // points to boundingRect
+    for (i = 0; i < rects.length; i++) {
+        var posArrayInRect = rects[i];
+
+        var boundingRect = { x: posArrayInRect[0].x, y: posArrayInRect[0].y },
+            maxX = 0,
+            maxY = 0;
+
+        for (j = 0; j < posArrayInRect.length; j++) {
+            boundingRect.x = Math.min(boundingRect.x, posArrayInRect[j].x);
+            boundingRect.y = Math.min(boundingRect.y, posArrayInRect[j].y);
+            maxX = Math.max(maxX, posArrayInRect[j].x);
+            maxY = Math.max(maxY, posArrayInRect[j].y);
+        }
+        boundingRect.width = maxX - boundingRect.x + 1;
+        boundingRect.height = maxY - boundingRect.y + 1;
+
+        rects[i] = boundingRect;
+    }
+    return rects;
 }
