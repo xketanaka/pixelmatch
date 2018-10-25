@@ -13,7 +13,7 @@ function pixelmatch(img1, img2, output, width, height, options) {
     // maximum acceptable square distance between two colors;
     // 35215 is the maximum possible value for the YIQ difference metric
     var maxDelta = 35215 * threshold * threshold,
-        diff = 0;
+        diffs = [];
 
     // compare each pixel of one image against the other one
     for (var y = 0; y < height; y++) {
@@ -35,7 +35,7 @@ function pixelmatch(img1, img2, output, width, height, options) {
                 } else {
                     // found substantial difference not caused by anti-aliasing; draw it as red
                     if (output) drawPixel(output, pos, 255, 0, 0);
-                    diff++;
+                    diffs.push({ x: x, y: y });
                 }
 
             } else if (output) {
@@ -46,8 +46,8 @@ function pixelmatch(img1, img2, output, width, height, options) {
         }
     }
 
-    // return the number of different pixels
-    return diff;
+    // return different points or count of it
+    return options.returnPositions ? diffs : diffs.length;
 }
 
 // check if a pixel is likely a part of anti-aliasing;
