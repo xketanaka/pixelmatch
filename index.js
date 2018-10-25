@@ -19,6 +19,9 @@ function pixelmatch(img1, img2, output, width, height, options) {
     for (var y = 0; y < height; y++) {
         for (var x = 0; x < width; x++) {
 
+            if (options.ignoreRects && includesPosInRects(x, y, options.ignoreRects)) {
+                continue;
+            }
             var pos = (y * width + x) * 4;
 
             // squared YUV distance between colors at this pixel position
@@ -203,4 +206,20 @@ function toBoundingRects(ksize) {
         rects[i] = boundingRect;
     }
     return rects;
+}
+
+function includesPosInRects(x, y, ignoreRects) {
+    if (! ignoreRects instanceof Array) {
+        ignoreRects = [ ignoreRects ];
+    }
+
+    for (var i = 0; i < ignoreRects.length; i++) {
+        var ignoreRect = ignoreRects[i];
+
+        if (ignoreRect.x <= x && x <= (ignoreRect.x + ignoreRect.width) &&
+            ignoreRect.y <= y && y <= (ignoreRect.y + ignoreRect.height)) {
+            return true;
+        }
+    }
+    return false;
 }
