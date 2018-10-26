@@ -13,12 +13,15 @@ function pixelmatch(img1, img2, output, width, height, options) {
     // maximum acceptable square distance between two colors;
     // 35215 is the maximum possible value for the YIQ difference metric
     var maxDelta = 35215 * threshold * threshold,
-        diff = 0;
+        diffs = [];
 
     // compare each pixel of one image against the other one
     for (var y = 0; y < height; y++) {
         for (var x = 0; x < width; x++) {
 
+            if (options.ignoreRects && includesPosInRects(x, y, options.ignoreRects)) {
+                continue;
+            }
             var pos = (y * width + x) * 4;
 
             // squared YUV distance between colors at this pixel position
@@ -35,7 +38,7 @@ function pixelmatch(img1, img2, output, width, height, options) {
                 } else {
                     // found substantial difference not caused by anti-aliasing; draw it as red
                     if (output) drawPixel(output, pos, 255, 0, 0);
-                    diff++;
+                    diffs.push({ x: x, y: y });
                 }
 
             } else if (output) {
@@ -46,8 +49,11 @@ function pixelmatch(img1, img2, output, width, height, options) {
         }
     }
 
-    // return the number of different pixels
-    return diff;
+    // add method for converting array of points to array of boundingRects
+    diffs.toBoundingRects = toBoundingRects;
+
+    // return different points or count of it
+    return options.returnPositions ? diffs : diffs.length;
 }
 
 // check if a pixel is likely a part of anti-aliasing;
@@ -157,4 +163,63 @@ function grayPixel(img, i) {
         g = blend(img[i + 1], a),
         b = blend(img[i + 2], a);
     return rgb2y(r, g, b);
+}
+
+function toBoundingRects(ksize) {
+    ksize = ksize || 10;
+
+    var rects = [];
+    posLoop: for (var i = 0; i < this.length; i++) {
+        for (var j = 0, pos = this[i]; j < rects.length; j++) {
+            for (var k = 0, posArrayInRect = rects[j]; k < posArrayInRect.length; k++) {
+
+                var posInRect = posArrayInRect[k];
+                var diffs = { width: Math.abs(pos.x - posInRect.x), height: Math.abs(pos.y - posInRect.y) }
+
+                if (diffs.width <= ksize && diffs.height <= ksize) {
+                    rects[j].push(pos);
+                    continue posLoop;
+                }
+            }
+        }
+        // if pos is not near to rects, add to rects.
+        rects.push([ pos ])
+    }
+
+    // points to boundingRect
+    for (i = 0; i < rects.length; i++) {
+        var posArrayInRect = rects[i];
+
+        var boundingRect = { x: posArrayInRect[0].x, y: posArrayInRect[0].y },
+            maxX = 0,
+            maxY = 0;
+
+        for (j = 0; j < posArrayInRect.length; j++) {
+            boundingRect.x = Math.min(boundingRect.x, posArrayInRect[j].x);
+            boundingRect.y = Math.min(boundingRect.y, posArrayInRect[j].y);
+            maxX = Math.max(maxX, posArrayInRect[j].x);
+            maxY = Math.max(maxY, posArrayInRect[j].y);
+        }
+        boundingRect.width = maxX - boundingRect.x + 1;
+        boundingRect.height = maxY - boundingRect.y + 1;
+
+        rects[i] = boundingRect;
+    }
+    return rects;
+}
+
+function includesPosInRects(x, y, ignoreRects) {
+    if (! ignoreRects instanceof Array) {
+        ignoreRects = [ ignoreRects ];
+    }
+
+    for (var i = 0; i < ignoreRects.length; i++) {
+        var ignoreRect = ignoreRects[i];
+
+        if (ignoreRect.x <= x && x <= (ignoreRect.x + ignoreRect.width) &&
+            ignoreRect.y <= y && y <= (ignoreRect.y + ignoreRect.height)) {
+            return true;
+        }
+    }
+    return false;
 }
